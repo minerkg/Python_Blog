@@ -56,7 +56,9 @@ class BlogPost(db.Model):
 
 # TODO: Create a User table for all your registered users.
 class User(db.Model, UserMixin):
-    
+    name = db.Column(db.String(250), nullable=False)
+    email = db.Column(db.String(250), nullable=False)
+    password = db.Column(db.String(250), nullable=False)
 
 
 with app.app_context():
