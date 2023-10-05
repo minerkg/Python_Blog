@@ -54,7 +54,9 @@ class BlogPost(db.Model):
     img_url = db.Column(db.String(250), nullable=False)
 
 
-# TODO: Create a User table for all your registered users. 
+# TODO: Create a User table for all your registered users.
+class User(db.Model, UserMixin):
+    
 
 
 with app.app_context():
