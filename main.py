@@ -9,7 +9,7 @@ from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy.orm import relationship
 # Import your forms from the forms.py
-from forms import CreatePostForm
+from forms import CreatePostForm, RegisterForm
 
 
 '''
@@ -34,10 +34,13 @@ Bootstrap5(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
 
+@login_manager.user_loader
+def load_user(User):
+    return db.get_or_404(User)
 
 
 # CONNECT TO DB
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///posts.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///blog.db'
 db = SQLAlchemy()
 db.init_app(app)
 
@@ -56,19 +59,36 @@ class BlogPost(db.Model):
 
 # TODO: Create a User table for all your registered users.
 class User(db.Model, UserMixin):
+    __tablename__ = "User"
+    id = db.Column(db.Ineger, primary_key=True)
     name = db.Column(db.String(250), nullable=False)
-    email = db.Column(db.String(250), nullable=False)
+    email = db.Column(db.String(250), nullable=False, primary_key=True)
     password = db.Column(db.String(250), nullable=False)
-
 
 with app.app_context():
     db.create_all()
 
 
 # TODO: Use Werkzeug to hash the user's password when creating a new user.
-@app.route('/register')
+@app.route('/register', methods=['GET', 'POST'])
 def register():
-    return render_template("register.html")
+    form = RegisterForm()
+    if form.validate_on_submit():
+        email = form.email.data
+        name = form.name.data
+        password = form.password.data
+        hashed_pass = generate_password_hash(password=password,
+                                             method='scrypt',
+                                             salt_length=8
+        )
+        new_user = User(name=name,
+                        email=email,
+                        password=hashed_pass
+        )
+        db.session.add(new_user)
+        db.session.commit()
+        return redirect(url_for('get_all_posts'))
+    return render_template("register.html", form=form)
 
 
 # TODO: Retrieve a user from the database based on their email. 
