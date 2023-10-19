@@ -9,7 +9,7 @@ from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy.orm import relationship
 # Import your forms from the forms.py
-from forms import CreatePostForm, RegisterForm
+from forms import CreatePostForm, RegisterForm, LoginForm
 
 
 '''
@@ -60,7 +60,7 @@ class BlogPost(db.Model):
 # TODO: Create a User table for all your registered users.
 class User(db.Model, UserMixin):
     __tablename__ = "User"
-    id = db.Column(db.Ineger, primary_key=True)
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     name = db.Column(db.String(250), nullable=False)
     email = db.Column(db.String(250), nullable=False, primary_key=True)
     password = db.Column(db.String(250), nullable=False)
@@ -92,9 +92,19 @@ def register():
 
 
 # TODO: Retrieve a user from the database based on their email. 
-@app.route('/login')
+@app.route('/login', methods=['GET', 'POST'])
 def login():
-    return render_template("login.html")
+    form = LoginForm()
+    if form.validate_on_submit():
+        email = form.email.data
+        password = form.password.data
+        if db.one_or_404(db.Select(User).where(User.email == email)):
+            user = db.one_or_404(db.Select(User).where(User.email == email))
+            passw_hash = user.password
+            if check_password_hash(pwhash=passw_hash, password=password):
+                login_user(user=user)
+                return redirect(url_for('get_all_posts'))
+    return render_template("login.html", form=form)
 
 
 @app.route('/logout')
