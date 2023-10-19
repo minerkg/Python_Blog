@@ -35,8 +35,8 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 
 @login_manager.user_loader
-def load_user(User):
-    return db.get_or_404(User)
+def load_user(user_id):
+    return db.get_or_404(User, user_id)
 
 
 # CONNECT TO DB
@@ -62,7 +62,7 @@ class User(db.Model, UserMixin):
     __tablename__ = "User"
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     name = db.Column(db.String(250), nullable=False)
-    email = db.Column(db.String(250), nullable=False, primary_key=True)
+    email = db.Column(db.String(250), nullable=False)
     password = db.Column(db.String(250), nullable=False)
 
 with app.app_context():
