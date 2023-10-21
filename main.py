@@ -39,6 +39,18 @@ def load_user(user_id):
     return db.get_or_404(User, user_id)
 
 
+def admin_only(func1):
+    @wraps(func1)
+    def wrapper_func(*args, **kwargs):
+        if current_user.id == 1:
+            return func1(*args, **kwargs)
+        else:
+            return "Your are not the administrator", 403
+
+    wrapper_func.__name__ = func1.__name__
+    return wrapper_func
+
+
 # CONNECT TO DB
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///blog.db'
 db = SQLAlchemy()
@@ -75,19 +87,26 @@ def register():
     form = RegisterForm()
     if form.validate_on_submit():
         email = form.email.data
-        name = form.name.data
-        password = form.password.data
-        hashed_pass = generate_password_hash(password=password,
-                                             method='scrypt',
-                                             salt_length=8
-        )
-        new_user = User(name=name,
-                        email=email,
-                        password=hashed_pass
-        )
-        db.session.add(new_user)
-        db.session.commit()
-        return redirect(url_for('get_all_posts'))
+        emails_in_thedb = db.session.execute(db.Select(User.email)).scalars().all()
+        print(emails_in_thedb)
+        if email in emails_in_thedb:
+            flash("User already exists, please login instead")
+            return redirect(url_for('login'))
+        else:
+            name = form.name.data
+            password = form.password.data
+            hashed_pass = generate_password_hash(password=password,
+                                                 method='scrypt',
+                                                 salt_length=8
+            )
+            new_user = User(name=name,
+                            email=email,
+                            password=hashed_pass
+            )
+            db.session.add(new_user)
+            db.session.commit()
+            login_user(user=new_user)
+            return redirect(url_for('get_all_posts'))
     return render_template("register.html", form=form)
 
 
@@ -98,17 +117,27 @@ def login():
     if form.validate_on_submit():
         email = form.email.data
         password = form.password.data
-        if db.one_or_404(db.Select(User).where(User.email == email)):
-            user = db.one_or_404(db.Select(User).where(User.email == email))
+        db.session.execute(db.select(User).where(User.email == email))
+        result = db.session.execute(db.select(User).where(User.email == email))
+        user = result.scalar_one()
+        if user:
+            print(user)
             passw_hash = user.password
             if check_password_hash(pwhash=passw_hash, password=password):
                 login_user(user=user)
                 return redirect(url_for('get_all_posts'))
-    return render_template("login.html", form=form)
+            else:
+                flash("The password is incorrect! Try again, but harder :D!")
+                redirect(url_for('login'))
+        else:
+            flash("The e-mail address is wrong!")
+            redirect(url_for('login'))
+    return render_template("login.html", form=form, current_user=current_user)
 
 
 @app.route('/logout')
 def logout():
+    logout_user()
     return redirect(url_for('get_all_posts'))
 
 
@@ -116,18 +145,19 @@ def logout():
 def get_all_posts():
     result = db.session.execute(db.select(BlogPost))
     posts = result.scalars().all()
-    return render_template("index.html", all_posts=posts)
+    return render_template("index.html", all_posts=posts, current_user=current_user)
 
 
 # TODO: Allow logged-in users to comment on posts
 @app.route("/post/<int:post_id>")
 def show_post(post_id):
     requested_post = db.get_or_404(BlogPost, post_id)
-    return render_template("post.html", post=requested_post)
+    return render_template("post.html", post=requested_post, current_user=current_user)
 
 
 # TODO: Use a decorator so only an admin user can create a new post
 @app.route("/new-post", methods=["GET", "POST"])
+@admin_only
 def add_new_post():
     form = CreatePostForm()
     if form.validate_on_submit():
@@ -142,11 +172,12 @@ def add_new_post():
         db.session.add(new_post)
         db.session.commit()
         return redirect(url_for("get_all_posts"))
-    return render_template("make-post.html", form=form)
+    return render_template("make-post.html", form=form, current_user=current_user)
 
 
 # TODO: Use a decorator so only an admin user can edit a post
 @app.route("/edit-post/<int:post_id>", methods=["GET", "POST"])
+@admin_only
 def edit_post(post_id):
     post = db.get_or_404(BlogPost, post_id)
     edit_form = CreatePostForm(
@@ -164,11 +195,12 @@ def edit_post(post_id):
         post.body = edit_form.body.data
         db.session.commit()
         return redirect(url_for("show_post", post_id=post.id))
-    return render_template("make-post.html", form=edit_form, is_edit=True)
+    return render_template("make-post.html", form=edit_form, is_edit=True, current_user=current_user)
 
 
 # TODO: Use a decorator so only an admin user can delete a post
 @app.route("/delete/<int:post_id>")
+@admin_only
 def delete_post(post_id):
     post_to_delete = db.get_or_404(BlogPost, post_id)
     db.session.delete(post_to_delete)
@@ -178,12 +210,12 @@ def delete_post(post_id):
 
 @app.route("/about")
 def about():
-    return render_template("about.html")
+    return render_template("about.html", current_user=current_user)
 
 
 @app.route("/contact")
 def contact():
-    return render_template("contact.html")
+    return render_template("contact.html", current_user=current_user)
 
 
 if __name__ == "__main__":
