@@ -34,6 +34,17 @@ Bootstrap5(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
 
+# TODO: Gavatar
+
+gravatar = Gravatar(app,
+                    size=100,
+                    rating='g',
+                    default='retro',
+                    force_default=False,
+                    force_lower=False,
+                    use_ssl=False,
+                    base_url=None)
+
 @login_manager.user_loader
 def load_user(user_id):
     return db.get_or_404(User, user_id)
@@ -69,6 +80,7 @@ class BlogPost(db.Model):
     img_url = db.Column(db.Text, nullable=False)
     author_id = db.mapped_column(db.Integer, db.ForeignKey('users.id'))
     author = relationship("User", back_populates="posts")
+    comments = relationship("Comment", back_populates='post')
 
 
 # TODO: Create a User table for all your registered users.
@@ -79,7 +91,17 @@ class User(db.Model, UserMixin):
     email = db.Column(db.String(250), nullable=False)
     password = db.Column(db.String(250), nullable=False)
     posts = relationship('BlogPost', back_populates="author")
+    comments = relationship('Comment', back_populates="commenter")
 
+
+class Comment(db.Model):
+    __tablename__ = "comments"
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    text = db.Column(db.Text, nullable=False)
+    commenter_id = db.mapped_column(db.Integer, db.ForeignKey('users.id'))
+    commenter = relationship('User', back_populates="comments")
+    post_id = db.mapped_column(db.Integer, db.ForeignKey('blog_posts.id'))
+    post = relationship('BlogPost', back_populates="comments")
 
 with app.app_context():
     db.create_all()
@@ -152,11 +174,29 @@ def get_all_posts():
 
 
 # TODO: Allow logged-in users to comment on posts
-@app.route("/post/<int:post_id>")
+@app.route("/post/<int:post_id>", methods=["GET", "POST"])
 def show_post(post_id):
     comment_form = CommentForm()
     requested_post = db.get_or_404(BlogPost, post_id)
-    return render_template("post.html", post=requested_post, current_user=current_user, form=comment_form)
+    comments = requested_post.comments
+    if comment_form.validate_on_submit():
+        if current_user.is_authenticated:
+            new_comment = Comment(
+                text=comment_form.comment.data,
+                commenter=current_user,
+                post=requested_post
+            )
+            db.session.add(new_comment)
+            db.session.commit()
+        else:
+            flash("You have to login first to comment!")
+            redirect(url_for("login"))
+    return render_template("post.html",
+                           post=requested_post,
+                           current_user=current_user,
+                           form=comment_form,
+                           comments=comments
+            )
 
 
 # TODO: Use a decorator so only an admin user can create a new post
