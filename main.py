@@ -145,8 +145,7 @@ def login():
         password = form.password.data
         result = db.session.execute(db.select(User).where(User.email == email)).first()
         if result is not None:
-            user = result.scalar_one()
-            print(user)
+            user = result[0]
             passw_hash = user.password
             if check_password_hash(pwhash=passw_hash, password=password):
                 login_user(user=user)
