@@ -65,17 +65,21 @@ class BlogPost(db.Model):
     subtitle = db.Column(db.String(250), nullable=False)
     date = db.Column(db.String(250), nullable=False)
     body = db.Column(db.Text, nullable=False)
-    author = db.Column(db.String(250), nullable=False)
-    img_url = db.Column(db.String(250), nullable=False)
+#    author = db.Column(db.String(250), nullable=True)
+    img_url = db.Column(db.Text, nullable=False)
+    author_id = db.mapped_column(db.Integer, db.ForeignKey('users.id'))
+    author = relationship("User", back_populates="posts")
 
 
 # TODO: Create a User table for all your registered users.
 class User(db.Model, UserMixin):
-    __tablename__ = "User"
+    __tablename__ = "users"
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     name = db.Column(db.String(250), nullable=False)
     email = db.Column(db.String(250), nullable=False)
     password = db.Column(db.String(250), nullable=False)
+    posts = relationship('BlogPost', back_populates="author")
+
 
 with app.app_context():
     db.create_all()
@@ -117,10 +121,9 @@ def login():
     if form.validate_on_submit():
         email = form.email.data
         password = form.password.data
-        db.session.execute(db.select(User).where(User.email == email))
-        result = db.session.execute(db.select(User).where(User.email == email))
-        user = result.scalar_one()
-        if user:
+        result = db.session.execute(db.select(User).where(User.email == email)).first()
+        if result is not None:
+            user = result.scalar_one()
             print(user)
             passw_hash = user.password
             if check_password_hash(pwhash=passw_hash, password=password):
