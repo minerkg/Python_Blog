@@ -189,7 +189,7 @@ def show_post(post_id):
             db.session.commit()
         else:
             flash("You have to login first to comment!")
-            redirect(url_for("login"))
+            return redirect(url_for("login"))
     return render_template("post.html",
                            post=requested_post,
                            current_user=current_user,
